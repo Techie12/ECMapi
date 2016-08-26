@@ -6,6 +6,31 @@ import requests
 def debug(text,db):
     if db == True:
         print(text)
+
+def readECMkeys():
+    with open("ECMkeys.txt", 'r') as f:
+        users = [f.readline().replace("\n",""),f.read()]
+        users[1] = json.loads(users[1])
+        users[0] = users[1][users[0]]
+        return(users)
+
+def authECMuser(user,userbase):
+    password = ""
+    if user.find(":") != -1:
+        user,password = user.split(":")
+    if userbase.has_key(user):
+        try:
+            if type(userbase[user]) == dict:
+                return user,userbase[user]
+            elif userbase[user][0] == password:
+                return user,userbase[user][1]
+            else:
+                return("Bad Password")
+        except:
+            raise ValueError("USER auth type Error")
+    else:
+        return("No ECM User Found!")
+
 # ------------------
 
 print("For ECM access [1]\nFor router access [2]")
