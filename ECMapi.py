@@ -16,6 +16,8 @@ class API:
 
     def get(self,call,paginate=1,**filters):
         # basic GET call to the API
+        # Allows two formats: ex.1 get("routers/?id=123")  ex.2 get("routers/",id="123")
+        # If you need an expanded field, either use option 1 or you have to specify as follows: ex. get("net_devices/",special={"router.id":"123"})
         output = []
         if filters != {}: filters = buildfilters(**filters)
         else: filters = ""
@@ -63,7 +65,7 @@ class API:
 
     # ------- High level calls -------
 
-    # Most high level call can pass any special filters to the base level call
+    # Most high level calls can pass any special filters to the base level call
 
     def devices(self,**kwargs):
         output = {}
@@ -118,36 +120,51 @@ class API:
         output =[[t["detected_at"][:t["detected_at"].find(".")].replace("T"," - "),self.get("routers/",fields="name&id="+t["router"][t["router"].find("routers/")+8:-1])[0]["name"],t["friendly_info"]] for t in val[0:limit]]
         return(output)
 
-    def router_setdetails(self,MAC):
-        # used to set the variable for router details so we don't have to make this call all the time for the other operations
-        output = self.get("routers/",mac=MAC,fields="account.id,account.name,group,id,name")[0] # account info for a device
+
+class router:
+    
+    def __init__(self,MAC,api):
+        self.MAC = MAC
+        self.api = api
+        output = self.api.get("routers/",mac=MAC,fields="account.id,account.name,group,id,name")[0] # account info for a device
         self.routerdetails = output
+
+    def datausage(self,after_time,writefile=False,**kwargs):
+        if self.routerdetails == {}: return("Must call router_setdetails first!")
+        output = {"history":[]}
+        for t in self.api.get("net_devices",special={"router.id":self.routerdetails["id"]},mode="wan",fields="name,id"):
+            val = self.api.get("net_device_usage_samples/",net_device=t["id"],limit="500",created_at__gt=after_time,fields="uptime,bytes_in,bytes_out,created_at",**kwargs)
+            output["history"].append({"total":sum([e["bytes_in"]+e["bytes_out"] for e in val]),"name":t["name"] ,"history":val})
+        output["total"] = [sum([t["total"] for t in output["history"]])]
+        output["total"].insert(0,str(sum([t["total"] for t in output["history"]])/1000000)+"MB")
+        if writefile:
+            with open("datausagehistory.txt", 'wb') as f: f.write(json.dumps(output))
         return output
     
-    def router_signalsamples(self,writefile=False):
+    def signalsamples(self,writefile=False):
         if self.routerdetails == {}: return("Must call router_setdetails first!")
         output = {}
-        val = self.get("net_devices",special={"router.id":self.routerdetails["id"]},mode="wan",fields="id,summary") # find used interfaces for this router
+        val = self.api.get("net_devices",special={"router.id":self.routerdetails["id"]},mode="wan",fields="id,summary") # find used interfaces for this router
         for t in val:
             if t["summary"] in ("disconnected", "configure error", "configureerror", "unplugged"):
                 pass
-            output[t["id"]] = self.get("net_device_signal_samples/",limit="24",net_device=t["id"]) # polls signal history, 1 call per interface
+            output[t["id"]] = self.api.get("net_device_signal_samples/",limit="24",net_device=t["id"]) # polls signal history, 1 call per interface
         if writefile:
             with open("signalhistory.txt", 'wb') as f: f.write(json.dumps(output))
         return output
 
-    def router_readconfig(self,writefile=False):
+    def readconfig(self,writefile=False):
         if self.routerdetails == {}: return("Must call router_setdetails first!")
-        output = self.get("configuration_managers/",special={"router.id":self.routerdetails["id"]},fields="suspended,configuration,pending")[0]
+        output = self.api.get("configuration_managers/",special={"router.id":self.routerdetails["id"]},fields="suspended,configuration,pending")[0]
         if writefile:
             with open("routerconfig.txt", 'wb') as f: f.write(json.dumps(output))
         return output
 
-    def router_logs(self,writefile=False,**kwargs):
+    def logs(self,writefile=False,**kwargs):
         if self.routerdetails == {}: return("Must call router_setdetails first!")
         if "paginate" not in kwargs: paginate = 1
         else: paginate = kwargs['paginate']
-        output = self.get("router_logs/",limit="500",router=self.routerdetails["id"],paginate=paginate)
+        output = self.api.get("router_logs/",limit="500",router=self.routerdetails["id"],paginate=paginate)
         with open("routerlog.csv", 'wb') as f:
             writer = csv.writer(f)
             writer.writerow(["time","level","source","message"])
@@ -155,16 +172,16 @@ class API:
                 writer.writerow([t["created_at"],t["level"],t["source"],t["message"]])
         return output
     
-    def router_createcase(self,MAC):
+    def createcase(self):
         # this is for the "Create a Case" option. lots of calls here, but should be infrequent.
         output = {}
-        output["routerdetails"] = self.router_setdetails(MAC)
+        output["routerdetails"] = self.routerdetails
         output["routerdetails"] = [[t for t in output["routerdetails"]],[stripurl(t) for t in output["routerdetails"].values()]]
         print(output["routerdetails"])
-        output["config"] = self.router_readconfig(writefile=True)
-        output["signalsamples"] = self.router_signalsamples(writefile=True) # polls signal history, 1 call per interface
+        output["config"] = self.readconfig(writefile=True)
+        output["signalsamples"] = self.signalsamples(writefile=True) # polls signal history, 1 call per interface
         # This is very slow 
-        output["logs"] = self.router_logs(writefile=True)
+        output["logs"] = self.logs(writefile=True)
         return(output)
 
 
@@ -222,6 +239,6 @@ if __name__ == "__main__":
 ##        v = api.alerts(5)
 ##        v = api.activitylog()
 ##        v = api.router_createcase("00304416ec94")
-        v = api.get("routers/?fields=id,name")
-        print(v)
+        r = router("00304416ec94",api)
+        v = r.datausage("2016-9-18",paginate=5)
     except: raise
