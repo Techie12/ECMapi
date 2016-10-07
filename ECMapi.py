@@ -37,28 +37,37 @@ class API:
         return output
 
     def patch(self,call,data,**filters):
-        # for future implementations
         if filters != {}: filters = buildfilters(**filters)
         else: filters = ""
         output = requests.patch(baseurl+call+filters, data=data, headers=self.headers)
         if str(output) == "<Response [202]>":
-            output = json.loads(output.content)
+            output = json.loads(output.content),output
         else:
             print(output)
             raise ValueError(str(call)+"  -->  "+str(output)+":  "+str(output.content)) # helps debug bad calls
         return output
 
     def put(self,call,data,**filters):
-        # for future implementations
         if filters != {}: filters = buildfilters(**filters)
         else: filters = ""
         output = requests.put(baseurl+call+filters, data=data, headers=self.headers)
         if str(output) == "<Response [202]>":
-            output = json.loads(output.content)
+            output = json.loads(output.content),output
         else:
             print(output)
             raise ValueError(str(call)+"  -->  "+str(output)+":  "+str(output.content)) # helps debug bad calls
         return output
+
+    def post(self,call,data,**filters):
+        if filters != {}: filters = buildfilters(**filters)
+        else: filters = ""
+        output = requests.post(baseurl+call+filters, data=data, headers=self.headers)
+        if str(output) == "<Response [202]>":
+            output = json.loads(output.content),output
+        else:
+            print(output)
+            raise ValueError(str(call)+"  -->  "+str(output)+":  "+str(output.content)) # helps debug bad calls
+        return output 
 
     def delete(self,call,**filters):
         return output
@@ -141,7 +150,8 @@ class router:
             with open("datausagehistory.txt", 'wb') as f: f.write(json.dumps(output))
         return output
     
-    def signalsamples(self,writefile=False):
+    def signalsamples(self):
+        writefile = False
         if self.routerdetails == {}: return("Must call router_setdetails first!")
         output = {}
         val = self.api.get("net_devices",special={"router.id":self.routerdetails["id"]},mode="wan",fields="id,summary") # find used interfaces for this router
@@ -153,12 +163,25 @@ class router:
             with open("signalhistory.txt", 'wb') as f: f.write(json.dumps(output))
         return output
 
-    def readconfig(self,writefile=False):
+    @property
+    def config(self):
+        writefile = False
         if self.routerdetails == {}: return("Must call router_setdetails first!")
-        output = self.api.get("configuration_managers/",special={"router.id":self.routerdetails["id"]},fields="suspended,configuration,pending")[0]
+        output = self.api.get("configuration_managers/",special={"router.id":self.routerdetails["id"]},fields="suspended,configuration,pending,id")[0]
+        self.configmanager = output["id"]
+        del output["id"]
         if writefile:
             with open("routerconfig.txt", 'wb') as f: f.write(json.dumps(output))
         return output
+
+    @config.setter
+    def config(self,value):
+        print("Check")
+        if self.configmanager == "":
+            self.configmanager = self.api.get("configuration_managers/",special={"router.id":self.routerdetails["id"]},fields="id")["id"]
+        print("configID: ",self.configmanager)
+        self.output = self.api.put("configuration_managers/"+str(self.configmanager)+"/",json.dumps(value))
+        return self.output
 
     def logs(self,writefile=False,**kwargs):
         if self.routerdetails == {}: return("Must call router_setdetails first!")
@@ -183,6 +206,21 @@ class router:
         # This is very slow 
         output["logs"] = self.logs(writefile=True)
         return(output)
+
+class config:
+    def __init__(self,config):
+        self.config = config
+    def editPassword(self,password):
+        for t in self.config["configuration"]:
+            pass
+    def recurse(self,structure,match):
+        path = [""]
+        for t in structure:
+            if match in structure[t]:
+                return [t]
+            if type(t) == dict:
+                return recurse(t,match)
+            
 
 
 def stripurl(url):
@@ -240,5 +278,7 @@ if __name__ == "__main__":
 ##        v = api.activitylog()
 ##        v = api.router_createcase("00304416ec94")
         r = router("00304416ec94",api)
-        v = r.datausage("2016-9-18",paginate=5)
+        v = r.config
+        print(v)
+        r.config = {u'configuration': [{u'wan': {u'rules2': {u'00000005-a81d-3590-93ca-8b1fcfeb8e14': {u'priority': 2.25, u'trigger_name': u'Modem-1ebb3902', u'_id_': u'00000005-a81d-3590-93ca-8b1fcfeb8e14', u'trigger_string': u'type|is|mdm%tech|is|lte/3g%uid|is|1ebb3902'}}}, u'system': {u'ui_activated': True, "gps": {"enabled":True}}}, []]}
     except: raise
