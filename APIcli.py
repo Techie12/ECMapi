@@ -21,7 +21,7 @@ def split(text,delim): # need to figure out how to adjust for single character v
             return [text]
 # ------------------
 
-print("For ECM access [1]\nFor router access [2]")
+print("For ECM access [1]\nFor router access [2] (future use)")
 selection = input("selection:")
 
 if selection == 1:
@@ -35,7 +35,7 @@ elif selection == 2:
     publicip = raw_input("Public IP: ")
     user = raw_input("Username: ")
     password = raw_input("Password: ")
-    baseurl = "http://"+publicip+":8080/api/"
+    baseurl = "http://%s:8080/api/" % publicip
     headers = {
         'Content-Type': 'application/json'}
     requests.get(baseurl, auth=requests.auth.HTTPDigestAuth(user,password))

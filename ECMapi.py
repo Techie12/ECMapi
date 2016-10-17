@@ -62,7 +62,7 @@ class API:
         if filters != {}: filters = buildfilters(**filters)
         else: filters = ""
         output = requests.post(baseurl+call+filters, data=data, headers=self.headers)
-        if str(output) == "<Response [202]>":
+        if str(output) == "<Response [201]>":
             output = json.loads(output.content),output
         else:
             print(output)
@@ -224,7 +224,7 @@ class config:
 
 
 def stripurl(url):
-    # formats poorly returned values (API urls rather than just ID nuumbers)
+    # formats poorly returned values (API urls rather than just ID numbers)
     if type(url) == dict:
         # this joins dictionary values with a '-' as a quick fix to data called and returns dictionaries we didn't want
         return("-".join([t for t in url.values()]))
@@ -244,7 +244,7 @@ def buildfilters(**kwargs):
 def readECMkeys():
     # reads the file for available ECM API keys and auutomatically selects the specified default
     with open("ECMkeys.txt", 'r') as f:
-        users = [f.readline().replace("\n",""),f.read()]
+        users = [f.readline().replace("\n","").replace("\r",""),f.read()]
         users[1] = json.loads(users[1])
         users[0] = users[1][users[0]]
         return(users)
