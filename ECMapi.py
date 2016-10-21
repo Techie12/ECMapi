@@ -129,6 +129,10 @@ class API:
         output =[[t["detected_at"][:t["detected_at"].find(".")].replace("T"," - "),self.get("routers/",fields="name&id="+t["router"][t["router"].find("routers/")+8:-1])[0]["name"],t["friendly_info"]] for t in val[0:limit]]
         return(output)
 
+    def creategroup(self, name, product, firmware, account):
+        id = self.post("groups/",json.dumps({"name": name, "product": product, "target_firmware": firmware, "account": account}))[0]["id"]
+        return str(id)
+
 
 class router:
     

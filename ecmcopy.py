@@ -1,50 +1,88 @@
 import ECMapi
 import argparse
-import json
+from json import dumps
 
-def get_account(ECM_Source_Account,accounts):
-    try:
-        account = accounts[1][ECM_Source_Account]
-    except:
+def getdebug(text,debuglevel):
+    if debuglevel:
+        output = ["----------"*20,str(text),"----------"*20,"\n"]
+        print("\n".join(output))
+
+def get_account(ECM_Account, accounts):
+    if ECM_Account != "":
+        account = accounts[1][ECM_Account]
+        return account
+    else:
         account = accounts[0]
-    return account
+        return account
+    raise Exception("No valid ECM Account")
 
-def creategroup(api,name,product,firmware,account):
-    id = api.post("groups/",json.dumps({"name":name,"product":product,"target_firmware":firmware,"account":account}))[0]["id"]
-    return str(id)
+def cleanconfig(config,options):
+    try:
+        del config["configuration"][0]["overlay"]
+        print("Removed NetCloud Engine Gateway")
+    except:
+        print("-> No NetCloud Engine Gateway (overlay config) needs removed")
+    return config
 
-def main(ECM_Source_Account,ECM_Destination_Account,Source_Config,Destination_Config,Passwords="",Remove_Wifi=False):
-    accounts = ECMapi.readECMkeys()
+def main(ECM_Source_Account,ECM_Destination_Account,Source_Config,Destination_Config,Passwords="",Remove_Wifi=False,debug=False):
+    print("\n--------------- Started ---------------\n")
+    try: accounts = ECMapi.readECMkeys()
+    except: raise Exception("Couldn't find ECMkeys.txt with valid ECM keys!")
     account = get_account(ECM_Source_Account, accounts)
+    getdebug(account,debug)
+    print("Loading ECM account %s" % ECM_Source_Account)
     api = ECMapi.API(account)
+    getdebug(api,debug)
     try:
         config = api.get("groups/",name=Source_Config)[0]
+        getdebug(config,debug)
+        print("Got Config from %s Group\n" % Source_Config)
     except:
         config = api.get("configuration_managers/?fields=configuration,router.product,router.actual_firmware,router.account&router.name=%s" % Source_Config)[0]
-        print(config)
+        getdebug(config,debug)
         try:
-
             config.update(config["router"])
-            print(config)
+            getdebug(config,debug)
+            print("Got Config from Router %s\n" % Source_Config)
         except:
             raise ValueError("Couldn't Find %s in Groups or Devices of %s ECM Account" % (Source_Config, ECM_Source_Account))
 
-    account = get_account(ECM_Destination_Account, accounts)
-    api = ECMapi.API(account)
+    print("Modifying Config ....")
+    config = cleanconfig(config,{"Passwords":Passwords,"Remove_Wifi":Remove_Wifi})
+    print("\n")
+    getdebug(config,debug)
+
+    if ECM_Source_Account != ECM_Destination_Account:
+        account = get_account(ECM_Destination_Account, accounts)
+        getdebug(account,debug)
+        print("Loading ECM account %s" % ECM_Destination_Account)
+        api = ECMapi.API(account)
+        getdebug(api,debug)
     try:
         deviceID = api.get("configuration_managers/?fields=id&router.name=%s" % Destination_Config)[0]['id']
-        print(deviceID)
-        api.put("configuration_managers/%s/" % deviceID, json.dumps({"configuration": config["configuration"]}))
+        getdebug(deviceID,debug)
+        print("Found device with device ID: %s" % deviceID)
+        var = api.put("configuration_managers/%s/" % deviceID, dumps({"configuration": config["configuration"]}))
+        getdebug(var,debug)
+        print("\nConfiguration Copied to %s" % Destination_Config)
     except:
-        if "actual_firmware" in config: config["target_firmware"] = config["actual_firmware"]
         try:
             groupID = api.get("groups/?fields=id&name=%s" % Destination_Config)[0]["id"]
-            print(groupID)
+            getdebug(groupID,debug)
+            print("Found group %s with group ID: %s" % (Destination_Config,groupID))
         except:
-            groupID = creategroup(api,Destination_Config, config["product"], config["target_firmware"], config["account"])
-        package = json.dumps({"configuration": config["configuration"]})
-        print(groupID,"\n----------\n",package)
-        api.put("groups/%s/" % groupID, package)
+            #if ECM_Source_Account != ECM_Destination_Account:
+                #config["account"] = api.get("account/fields=id&)
+            if "actual_firmware" in config: config["target_firmware"] = config["actual_firmware"]
+            groupID = api.creategroup(Destination_Config, config["product"], config["target_firmware"], config["account"])
+            getdebug(groupID,debug)
+            print("Couldn't find group %s, created group with ID: %s" % (Destination_Config,groupID))
+        package = dumps({"configuration": config["configuration"]})
+        getdebug(package,debug)
+        var = api.put("groups/%s/" % groupID, package)
+        getdebug(var,debug)
+        print("\nConfiguration Copied to %s!" % Destination_Config)
+    print("\n--------------- Finished ----------------\n")
 
 
 
@@ -66,9 +104,10 @@ if __name__ == "__main__":
                              "(required if passwords are not default but blank value restores defaults)")
     parser.add_argument("-rw","--Remove_Wifi", dest="Remove_Wifi", default=False, action="store_true",
                         help="Remove wifi config from the source to change products or avoid wifi issues")
+    parser.add_argument("--debug", dest="debug", default=False, action="store_true", help="Get debug output")
     args = vars(parser.parse_args())
 
-    print(args)
+    getdebug(args,args["debug"])
 
     main(args["ECM_Source_Account"], args["ECM_Destination_Account"], args["Source_Config"], args["Destination_Config"],
-         Passwords=args["Passwords"], Remove_Wifi=args["Remove_Wifi"])
+         Passwords=args["Passwords"], Remove_Wifi=args["Remove_Wifi"],debug=args["debug"])
