@@ -13,6 +13,16 @@ class API:
     def __init__(self, headers):
         self.headers = headers
         self.routerdetails = {}
+        self.accounts = self.get("accounts/",limit="500")
+        self.account_list = [t["resource_url"] for t in self.accounts]
+        for account in self.accounts:
+            if not account["account"] in self.account_list:
+                self.me = account["resource_url"]
+                break
+        else:
+            raise Exception("Couldn't figure out parent account!")
+
+
 
     def get(self,call,paginate=1,**filters):
         # basic GET call to the API
