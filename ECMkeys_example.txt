@@ -1,0 +1,22 @@
+Account1
+
+{
+"Account1": {
+        "X-CP-API-ID": "1a2b3c4d",
+        "X-CP-API-KEY": "1234567890abcdef1234567890abcdef",
+        "X-ECM-API-ID": "12345678-90ab-cdef-1234-567890abcdef",
+        "X-ECM-API-KEY": "1234567890abcdef1234567890abcdef12345",
+        "Content-Type": "application/json" },
+"Account2": {
+        "X-CP-API-ID": "1a2b3c4d",
+        "X-CP-API-KEY": "1234567890abcdef1234567890abcdef",
+        "X-ECM-API-ID": "12345678-90ab-cdef-1234-567890abcdef",
+        "X-ECM-API-KEY": "1234567890abcdef1234567890abcdef12345",
+        "Content-Type": "application/json" },
+"Another Account": {
+        "X-CP-API-ID": "1a2b3c4d",
+        "X-CP-API-KEY": "1234567890abcdef1234567890abcdef",
+        "X-ECM-API-ID": "12345678-90ab-cdef-1234-567890abcdef",
+        "X-ECM-API-KEY": "1234567890abcdef1234567890abcdef12345",
+        "Content-Type": "application/json" },
+}
